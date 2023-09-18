@@ -1,0 +1,7 @@
+{
+	"smslife":      { "File": "SMSLife.ogg", "Type": "Sound"},
+        "smsDB":      { "File": "SMSDB.ogg", "Type": "Sound"},
+        //super music look i just wanted to share my jams okay
+	"Yo_Kai_Disco":		 { "File": "ykd.ogg", "Type": "Music", "Name": "That song goes hard-Benkoopa", "LoopStart": "441800" },
+}
+

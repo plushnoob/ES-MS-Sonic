@@ -1,0 +1,233 @@
+global u8 SMSlifesettings
+global u8 SMSnoringsatboss
+global u16 SMSSonic.RingsHeld
+global bool SMSSonic.NORINGS
+global bool SMSmusic
+global u8 SMSlrz
+function u64 Standalone.getModdedSoundKey(u64 soundKey, u8 sfxId, u8 soundRegType)
+{
+	
+	if (sfxId == MUSIC_SUPER && global.xtrachar == 91)
+    {
+        // just wanted to put my jams here
+            if (SMSmusic)
+                return "ykd"
+    }
+	return base.Standalone.getModdedSoundKey(soundKey, sfxId, soundRegType)
+}
+//Reset the held ring variable on restart
+//# address-hook(0x006a76) end(0x006bd6)
+function void InitializeGameCharacters()
+{
+	SMSSonic.RingsHeld = 0
+	SMSSonic.NORINGS = false
+	
+	
+	base.InitializeGameCharacters()
+	return
+}
+
+//# address-hook(0x068646) end(0x06868e)
+function void fn068646()
+{
+	if (XtraChar == 91 && SMSSonic.RingsHeld > 0)
+	{
+		ring_counter = SMSSonic.RingsHeld
+		SMSSonic.RingsHeld = 0
+	}
+	base.fn068646()
+}
+// reset rings after getting a extra life
+function bool checkForExtraLifeByRings()
+{
+	if (XtraChar != 91 || SMSlifesettings == 0)
+	{
+		return base.checkForExtraLifeByRings()
+	}
+	
+	if (ring_counter >=100)
+	{
+		if (super.active == 0 && super.active.tails == 0)
+		{
+			extra_lives_granted += 2
+			ring_counter -= 100
+			return true
+		}
+		else
+		{
+			ring_counter = 99
+		}
+	}
+		
+	return false
+}
+
+
+
+//Play Master System Jingle if SMS life settings are chosen
+function void gainExtraLife()
+{
+	if (XtraChar != 91 || SMSlifesettings == 0)
+	{
+		base.gainExtraLife()
+		return
+	}
+		
+#if STANDALONE
+	// No extra lives in Time Attack
+	if (Game.isTimeAttack())
+		return
+
+	if (Game.getSetting(SETTING_INFINITE_LIVES))
+	{
+		lives_counter = 3
+	}
+	else
+	{
+		lives_counter = min(lives_counter + 1, 99)
+		++hud.dirty.lives
+		//playMusic(MUSIC_EXTRALIFE)
+		Audio.playAudio("smslife", AudioContext.CONTEXT_SOUND)
+	}
+#else
+	++lives_counter
+	++hud.dirty.lives
+	//playMusic(MUSIC_EXTRALIFE)
+	Audio.playAudio("smsLife", AudioContext.CONTEXT_SOUND)
+#endif
+}
+
+
+//# address-hook(0x042f78) end(0x043016)
+function void fn042f78()
+{
+	if (XtraChar != 91 || SMSlrz >= 4)
+	{
+		base.fn042f78()
+		return
+	}
+	D5 = 0
+	A2 = A0 + 0x2e
+	A1 = 0xffffb000
+	D6 = 3		// object.flag.P1_ON_OBJECT
+	fn04301c()
+
+	++A2
+	A1 = 0xffffb04a
+	D6 = 4		// object.flag.P2_ON_OBJECT
+	fn04301c()
+
+	D0 = u32[A0 + 0x30]
+	// this controls the speed for both spindashing and peelouting
+    if (XtraChar == 91)
+	{
+	D5 = (SMSlrz == 0) ? (D5 << 16) + (D5 >> 16) : (SMSlrz == 1) ? (D5 << 17) + (D5 >> 17) : (SMSlrz == 2) ? (D5 << 18) + (D5 >> 18) : (D5 << 19) + (D5 >> 19)
+	}
+	else
+	D5 = (D5 << 16) + (D5 >> 16) 
+	D5.s32 >>= 3
+	D0 += D5
+	if (D0.s32 < 0)
+	{
+		D0 = 0
+		D5 = 0
+	}
+	D1 = objA0.countdown_callback
+	if (D0 >= D1)
+	{
+		D0 = D1
+		D5 = 0
+	}
+
+	u32[A0 + 0x30] = D0
+	D0 = (D0 << 16) + (D0 >> 16)
+	D0.u16 += u16[A0 + 0x46]
+	objA0.position.y.u16 = D0.u16
+
+	D0.u8 = level.framecounter.low & 0x03
+	if (D0.u8 == 0 && D5 != 0)
+	{
+		if (D5.s32 < 0)
+		{
+			++objA0.animation.sprite
+			if (objA0.animation.sprite >= 3)
+			{
+				objA0.animation.sprite = 0
+			}
+		}
+		else
+		{
+			--objA0.animation.sprite
+			if (objA0.animation.sprite == 0xff)
+			{
+				objA0.animation.sprite = 2
+			}
+		}
+
+		D0.u8 = level.framecounter.low & 0x0f
+		if (D0.u8 == 0)
+		{
+			playSound(0xd7)
+		}
+	}
+
+	D1.u16 = 0x2b
+	D2.u16 = 0x08
+	D3.u16 = 0x09
+	D4.u16 = objA0.position.x.u16
+	fn01dc56()
+	DrawOrUnloadObject()
+}
+
+//PLAYMUSIC -> Remove rings on bosses/knuckles/whatever and restore them after
+//# address-hook(0x001358) end(0x001378)
+function void playMusic(u8 soundId)
+{
+	if (XtraChar == 91 && SMSnoringsatboss == 1)
+	{
+		if ((soundId == 0x1f && global.zone_act == 0x1601)||soundId == 0x18 || soundId == 0x19 || soundId == 0x2e || soundId == 0x2e || soundId == 0x30 || soundId >= 0xf2 && soundId <= 0xf7)	//if it's a boss or knuckles, take the rings out and store them
+		{		
+			if (SMSSonic.NORINGS != true) //check if we took rings already because super/hyper calls this twice
+			{
+				SMSSonic.RingsHeld = ring_counter
+				SMSSonic.NORINGS = true
+				ring_counter = 0
+			}
+		}
+		else //if not a boss and I have rings stored, set them, but NOT on ssz2. We don't want knuckles to get rings back
+		{			
+			if (SMSSonic.RingsHeld > 0 && global.zone_act == 0x0a01 )
+			{
+				ring_counter = SMSSonic.RingsHeld
+				SMSSonic.RingsHeld = 0
+			}
+			SMSSonic.NORINGS = false
+		}
+	}
+	//continue with base function
+	base.playMusic(soundId)
+}
+
+//remove rings from lava reef 2 boss
+//# address-hook(0x00e8be) end(0x00e940)
+function void InitStaticRings()
+{
+	if (XtraChar == 91 && SMSnoringsatboss != 0 && global.zone_act == 0x1600)
+		return
+	
+	base.InitStaticRings()
+  return
+}
+//rings cannot be collected in boss phases
+//# address-hook(0x01a596) end(0x01a5e8)
+function void CollectRing()
+{
+	if (XtraChar == 91 && SMSSonic.NORINGS)
+	{
+		playSound(0x7b)
+		return
+	}
+	
+	base.CollectRing()
+	return
+}
