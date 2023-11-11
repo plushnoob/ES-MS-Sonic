@@ -4,6 +4,7 @@ unfixable - hyper ending palettes do not cycle between each other properly
 //code
 Plushnoob -  Main scripter
 Icloudius - Helped out with sms mode, really cool guy
+V1.0 - 1.1.0 only
 Lave slime - Slot machine code
 // play testers
 Benkoopa - first guy i asked to play test 
@@ -12,7 +13,8 @@ Michael 7 - :chipmunk:
 Thanks guys for catching bugs
 //sprites
 Plushnoob -  tweaking,editing sprites, & save portraits
-Sonic 3 complete team - S3C super sonic sprites
+SA_3 - New save portrait for the normal ending
+Sonic 3 complete team - S3C super sonic sprites, FBZ monkey bars sprites
 Mikel Nash/Mecha Crawford - original creator of sonic worlds/3d2d super sonic sprites,s1 victory pose
 Sonic 3 expanded - falling sprites ,spring twirl sprites, One frame from the s1 victory pose
 //misc
