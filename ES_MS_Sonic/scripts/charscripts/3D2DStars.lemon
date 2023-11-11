@@ -1,0 +1,406 @@
+global u8 HyperStars
+//Use the 3d2d super stars for the hyper forms
+//Trigger the stars for hyper form, replace hyper behaviour -- FOR TAILS ONLY
+function bool Character.performSuperTransformation()
+{
+	if (global.xtrachar != 91 || HyperStars == 0)
+	{
+		return base.Character.performSuperTransformation()
+	}
+
+	// Already super?
+	if (super.active)
+		return false
+
+	u8 possibleSuperForm = 0	// 1 for Super, 2 for Hyper
+
+	// Tails is first player?
+	if (char.character == CHARACTER_TAILS)
+	{
+		if (!isMainCharacter(CHARACTER_TAILS))
+			return false
+
+		if (super.active.tails)
+			return false
+	}
+
+	// Special handling for Tails
+	if (char.character == CHARACTER_TAILS && !Game.getSetting(SETTING_HYPER_TAILS))
+	{
+		// Ready to get Super Tails?
+		if (global.super_emeralds >= 7)
+		{
+			possibleSuperForm = 2
+		}
+	}
+	else
+	{
+		// Can go super?
+		if (global.super_emeralds >= 7)
+		{
+			possibleSuperForm = 2
+		}
+		else if (global.chaos_emeralds >= 7 && global.traded_emeralds == 0)
+		{
+			possibleSuperForm = 1
+		}
+	}
+
+	if (possibleSuperForm == 0)
+		return false
+
+	// Check requirements
+	if (ring_counter < 50 || !hud.dirty.timer || char.control_flags != 0)	// Last check is needed e.g. for the snowboarding section
+		return false
+//ACTIVATE 3D2D stars for the hyper form - END
+		
+	if (char.character == CHARACTER_SONIC)
+	{
+		char.mapping_offset = 0x146816
+		char.state = char.state.TRANSFORMING
+
+		if (possibleSuperForm == 2)
+		{
+			super.active = 0xff
+			//u32[0xffffcd7c] = 0x019348		// Hyper Sonic stars
+					//instance the stars. 6 rotating stars + 8 dissipating ones
+		//No need to backup A0, A0 is ALREADY the player! I can use char here!
+		//call the instance function the appropriate amount of times
+		//type, range, starting angle, x, y				
+		//ROTATING STARS
+		S3d2dStars.SpawnStar(0, 10, 0x00,  char.position.x.u16,  char.position.y.u16)
+		S3d2dStars.SpawnStar(0, 10, 0x80,  char.position.x.u16,  char.position.y.u16)
+		S3d2dStars.SpawnStar(1, 15, 0x00,  char.position.x.u16,  char.position.y.u16)
+		S3d2dStars.SpawnStar(1, 15, 0x80,  char.position.x.u16,  char.position.y.u16)
+		S3d2dStars.SpawnStar(0, 20, 0x00,  char.position.x.u16,  char.position.y.u16)
+		S3d2dStars.SpawnStar(0, 20, 0x80,  char.position.x.u16,  char.position.y.u16)
+		//FADING STARS are instanced 4 every 8 frames at 0 type stars then die		
+		// 0 = normal star
+		// 1 = backward rotating star
+		// 2 = fading star goes upward and(dies after a frame cycle)
+		}
+		else
+		{
+			super.active = 1
+			u32[0xffffcbc0] = 0x019156		// Super Sonic stars
+		}
+	}
+	else if (char.character == CHARACTER_TAILS)
+	{
+		super.active.tails = 1
+		char.state = char.state.TAILS_TRANSFORM
+
+		if (possibleSuperForm == 2)
+		{
+			// Call the flicky army of death
+			//u32[0xffffcd7c] = 0x01a170		// No super Flickies for Chaos
+
+		#if STANDALONE
+			super.active.tails = 0xff
+		#endif
+		}
+	}
+	else if (char.character == CHARACTER_KNUCKLES)
+	{
+		char.state = char.state.TRANSFORMING
+
+		if (possibleSuperForm == 2)
+		{
+			super.active = 0xff
+			u32[0xffffcbc0] = 0x01a494		// After-images effect
+		}
+		else
+		{
+			super.active = 1
+			u32[0xffffcbc0] = 0x019156		// Super Knuckles stars
+		}
+	}
+
+#if STANDALONE
+	if (super.active == 0xff)
+	{
+		// Stop drowning music
+		if (char.drown_countdown < 12)
+		{
+			playMusic(MUSIC_CTRL_FADEOUT)
+		}
+
+		// Reset drowning countdown
+		char.drown_countdown = 30
+	}
+#endif
+
+	super.palettefx.state = 1
+	super.palettefx.timer = 0x0f
+	super.ring_dec.frames = 60
+	char.control_flags = 0x81
+
+	setSpeedCapProperties(A4)
+
+	char.invinc.countdown = 0
+	char.bonus_effect |= char.bonus.INVINCIBLE
+
+	playSound(SFX_SUPERTRANSFORM)
+#if STANDALONE
+	chooseFittingMusic()	// Usually switches to super theme
+#else
+	playMusic(MUSIC_INVINCIBLE)
+#endif
+
+#if STANDALONE
+	if (super.active == 0xff || super.active.tails == 0xff)
+	{
+		Game.setAchievementComplete(ACHIEVEMENT_GOING_HYPER)
+	}
+#endif
+	return true
+}
+
+//Doomsday needs a trigger too
+//# address-hook(0x08167c) end(0x0816ee)
+function void fn08167c()
+{
+	if (global.xtrachar != 91 || HyperStars == 0)
+	{
+		base.fn08167c()
+		return
+	}
+	
+	objA0.velocity.y -= 0x20
+	UpdateMovementStraightSimple()
+
+	A1 = 0xffffb000
+	if (u8[A1 + 0x2e] != 0)
+		return
+
+	objA0.base_state = 0x06
+	objA0.velocity.x = 0
+	objA0.velocity.y = 0
+	objA0.flags38 |= 0x04
+	u8[A1 + 0x2e] = 0x01
+	objA1.state = char.state.RUNNING
+//I'm sorry, knuX gets locked in the glide, or defaults to run
+//all my mod have a float run when super, so I do not care! Knux is not supposed to be here anyway!
+//#if STANDALONE
+//	if (isMainCharacter(CHARACTER_KNUCKLES))
+//		objA1.state = char.state.KNUX_FLYCLIMB
+//#endif
+	objA1.velocity.x = 0x1000
+	u16[A1 + 0x1c] = 0x1000
+
+	if (global.super_emeralds != 7)
+	{
+		u32[0xffffcbc0] = 0x08242a		// Super Sonic stars in Doomsday Zone
+	}
+	else
+	{
+		fn05fcce()
+		//u32[0xffffcd7c] = 0x019348		// Hyper Sonic stars
+		S3d2dStars.SpawnStar(0, 10, 0x00,  char.position.x.u16,  char.position.y.u16)
+		S3d2dStars.SpawnStar(0, 10, 0x80,  char.position.x.u16,  char.position.y.u16)
+		S3d2dStars.SpawnStar(1, 15, 0x00,  char.position.x.u16,  char.position.y.u16)
+		S3d2dStars.SpawnStar(1, 15, 0x80,  char.position.x.u16,  char.position.y.u16)
+		S3d2dStars.SpawnStar(0, 20, 0x00,  char.position.x.u16,  char.position.y.u16)
+		S3d2dStars.SpawnStar(0, 20, 0x80,  char.position.x.u16,  char.position.y.u16)
+		u32[0xffffcbc0] = 0x01a494		// After-images effect
+	}
+
+	addPatternLoadingCue(0x083d64)
+}
+
+//instance a star
+//type, range, starting angle
+function void S3d2dStars.SpawnStar (u8 type, u8 range, u8 angle, u16 posx, u16 posy)
+{
+	//backup A1 and A0
+	push(A1)
+	push(A0)
+	if (allocDynamicObjectStd())
+	{
+		A0 = 0xffffb000
+		//define an unused update_address
+		//for readers looking to learn:
+		//search for the update address in the game files to make sure it is not 
+		//already used by the game!
+		objA1.update_address = 0x20008e		//NOTE: 200099 is too high!
+		//objA1.render_flags = (render_flag.WORLD | render_flag.VISIBLE)	//set visibility flags
+		//box size -- the size determines when it "dies" offscreen, but the stars will hardly be out of it
+		objA1.box_size.x = 0x5									
+		objA1.box_size.y = 0x5
+		//get the render flags
+		objA1.render_flags = objA0.render_flags
+		//This is the angle, not important
+		u8[A1 + 0x26] = 0x00	
+		
+		
+		//the char pos values should be stored somewhere...I need to search for usable values in the object itself
+		//I need to save				
+		// real position
+		// objA0.position.x.u16		= u16[A0 + 0x10]
+		// objA0.position.y.u16		= u16[A0 + 0x14]
+		objA1.position.x.u16 = posx
+		objA1.position.y.u16 = posy
+		// starting sprite number
+		// objA0.animation.sprite = u8[A0 + 0x22]
+		objA1.animation.sprite = 0
+		// Range from the center
+		// objA0.animation.frame = u8[A0 + 0x23]
+		objA1.animation.frame = range			
+		
+		//max countdown for reposition
+		//near star always repositions
+		if (range == 10)
+		{
+			objA1.value32 = 0
+		}
+		else if (range == 15) //middle star repositions every 6
+		{
+			objA1.animation.sprite = 7
+			objA1.value32 = 6
+		}
+		else if (range == 20) //far star repositions every 12
+		{
+			objA1.value32 = 12
+		}
+		//timer for reposition near player
+		//objA1.animation.timer = objA1.value32
+		//countdown to spawn child star for type 0 stars every 8 frames	
+		// objA0.value2f =  u8[A0 + 0x2f]
+		if (type == 0)
+		{
+			objA1.value2f = 8
+		}
+		// Angle applied on creation
+		// objA0.value26 = u8[A1 + 0x26]
+		objA1.value26 = angle
+			
+		// calculated offsets for the render function
+		// objA0.velocity.x	= s16[A0 + 0x18]
+		// objA0.velocity.y	= s16[A0 + 0x1a]	
+		// final formula, including position:
+		// posx + (range * sin delta)
+		// posy - (range * cos delta)
+		if (type < 2)
+		{
+			objA1.velocity.x = lookupSin(angle) * range
+			objA1.velocity.y = lookupCos(angle) * range
+		}
+		// state (to track type and death)
+		//objA0.state				=  u8[A0 + 0x20]
+		// 0 = normal star
+		// 1 = rotate backward star
+		// 2 = fading star goes upward and(dies after a frame cycle)
+		// 3 = DEAD
+		objA1.state = type		
+		
+	}
+	//restore A1 and A0
+	A0 = pop()
+	A1 = pop()	
+}
+	
+//UPDATE A STAR USING THE ADDRESS HOOK I CHOOSE WHEN INSTANCING
+//# address-hook(0x20008e)
+function void S3d2dStars.Star.Update()
+{
+	//note, the star is A0 here	
+	//unload if not super
+	if (super.active == false && super.active.tails == false)
+	{
+		UnloadObject()		
+	}
+	else
+	{
+		u16 posx = objA0.position.x.u16
+		u16 posy = objA0.position.y.u16		
+		//System.writeDisplayLine(stringformat("state: %02x", objA0.state))
+		if (objA0.state < 2) //ROTATING STARS
+		{	
+			//if type 0, increase the spawn timer and spawn a child	every 8 frames and rotate forward
+			if (objA0.state == 0)
+			{
+				objA0.value2f = objA0.value2f - 1
+				if (objA0.value2f == 0)
+				{
+					//spawn a child star at apparent position, no offset, type 2
+					S3d2dStars.SpawnStar(2, 0, 0x00,  posx + objA0.velocity.x, posy - objA0.velocity.y)
+					objA0.value2f = 8
+					//playSound(SFX_GRAB)	
+				}
+				//rotate forward
+				if (objA0.value26 == 0xee)
+				{
+					objA0.value26 = 0
+				}
+				else
+				{
+					objA0.value26 = objA0.value26 + 4
+				}
+			}
+			else //type 1, rotate backward
+			{
+				//rotate backward
+				if (objA0.value26 == 0x00)
+				{
+					objA0.value26 = 0xee
+				}
+				else
+				{
+					objA0.value26 = objA0.value26 - 4
+				}
+			}
+			//all update the reposition timer
+			if (objA0.animation.timer == 0)
+			{
+				//reposition on player
+				push(A1)
+				A1 = 0xffffb000
+				objA0.position.x.u16 = objA1.position.x.u16
+				objA0.position.y.u16 = objA1.position.y.u16								
+				//also update the render flags with the player's
+				//so the stars are always correct and go behind walls/effects etc
+				objA0.render_flags = objA1.render_flags
+				objA0.sprite_priority = objA1.sprite_priority
+				//restore A1
+				A1 = pop()
+				//reset timer
+				objA0.animation.timer = objA0.value32
+			}
+			else
+			{
+				objA0.animation.timer = objA0.animation.timer -1
+			}
+			// update animation frame
+			objA0.animation.sprite = objA0.animation.sprite + 1
+			if (objA0.animation.sprite > 0x0d)
+			{
+				objA0.animation.sprite = 0
+			}
+			//update angle offset
+			objA0.velocity.x = (lookupSin(objA0.value26) * objA0.animation.frame) >> 8
+			objA0.velocity.y = (lookupCos(objA0.value26) * objA0.animation.frame) >> 8
+			//System.writeDisplayLine(stringformat("velocity: %02x", objA0.velocity.x))
+		}
+		else //fading stars - alive 
+		{
+			//move up
+			objA0.position.y.u16 = objA0.position.y.u16 -2
+			//System.writeDisplayLine(stringformat("Y: %02x",objA0.position.y.u16))			
+			//die
+			if (objA0.animation.sprite > 0x0d)
+			{ 
+				//this star dies
+				UnloadObject()
+				return //do not trigger rendering on a dead item
+			}
+			else
+			{
+				//increase sprite
+				objA0.animation.sprite = objA0.animation.sprite + 1
+			}
+		}
+		//without this the game doesn't render!
+		objA0.position.x.u16 -= u16[0xffffeebc]
+		DrawObject()				
+	}
+}

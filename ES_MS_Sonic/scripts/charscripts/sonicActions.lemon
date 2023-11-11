@@ -1,0 +1,891 @@
+global u8 SMSSonic.ShieldEffectActive //Controls if the shield effect should be seen or not when super
+global u8 SMSmoveset
+global u8 SMSonic.AirSpinCounter //Tripe trouble roll counter. At 61 unrolls.
+global u8 SMSbutton
+global u8 SMSBuff
+global u8 SMSTailss
+global u8 SMSSD
+global bool SMSsounds // sound additions MS Sonic edition (when sound additions plus get forum release)
+global bool SMSflash
+
+function void Character.updateJumpMoves()
+{
+      //moving 3d in 2d mode to another lemon file
+      if (XtraChar != 91 || char.character != CHARACTER_SONIC || SMSmoveset > 5)
+	  {
+	    base.Character.updateJumpMoves()
+		return
+	  }
+	     //manage the moveset
+         u8 input_state      = control.player1.state
+		 u8 input_pressed    = control.player1.pressed
+		 bool isSuperActive  = super.active
+	//Master system's moveset has NO secondary skills, no dropdash too.
+	if (char.jumping)
+	{	
+		// Limit velocity.y
+		s16 max_vy = (char.flags & char.flag.UNDERWATER) ? -0x200 : -0x400
+		if (char.velocity.y < max_vy)
+		{
+			// Limit vertical velocity while not pressing any jump button
+			//  -> This is important to support low jumps by just tapping the button briefly
+			if ((input_state & CONTROL_ABC) == 0)
+			{
+				char.velocity.y = max_vy
+			}
+		}
+		else //still have to check for tails assist AND super form!
+		{
+			if (Input.buttonPressed(BUTTON_Y))
+			{
+				if (!isSuperActive && char.invuln.countdown == 0)	// Check invulnerability to prevent spamming of super activate + cancel
+				{
+					if (Character.performSuperTransformation())
+						return
+				}
+			}
+			if (input_pressed & CONTROL_ABC)
+			{				
+				// Check for other things to do instead of the usual reaction to jump button pressed
+				if (onCharacterPressedJumpInMidAir(input_state, input_pressed))
+				{
+					//V1.3 -- extra jump for Blast and Master System movesets
+					//Hyper sonic has the hyperdash no matter the moveset
+					if (XtraChar == 91 || CHARACTER_SONIC || super.active & 0x80||SMSmoveset==0||SMSmoveset==4)
+					{
+						ExtraChar.pressedJumpInMidAir_char91()
+					}
+					
+				}
+			}					
+		}
+	}
+	// i wasted half an hour trying to fix this only to realise sota the knuck put the reset state in another function
+	else if (char.spindash == 0)
+	{
+		//Triple Trouble Roll Skill (if we are not in a rolling state)
+		//In the game it can be triggered on any air state (spring or simple falling)
+		if (char.state != char.state.ROLLING && (SMSmoveset == 3 || SMSmoveset == 0) && (input_pressed & CONTROL_ABC) && SMSonic.AirSpinCounter == 0)
+		{
+			char.state = char.state.ROLLING
+			//add a timer and a used variable (char.double_jump_state = 1 is usable)
+			//char.double_jump_state = 1
+			SMSonic.AirSpinCounter = 1
+			//sound additions MS sonic edition 
+			if (SMSsounds)
+			{
+				playSound(0x4a)
+			}
+		}
+		
+		if (SMSonic.AirSpinCounter > 0 && SMSonic.AirSpinCounter < 0x1f)
+		{
+			SMSonic.AirSpinCounter = SMSonic.AirSpinCounter + 1
+		}
+		if (SMSonic.AirSpinCounter == 0x1f) //31, so half a second
+		{ //restore the fall/spring action
+			if (char.velocity.y >= 0 || (global.inv_gravity && char.velocity.y <= 0 ))
+			{//fall
+				char.state = char.state.RUNNING
+			}
+			else
+			{//normal straight jump (even if it was a spin inducing spring)
+				char.state = char.state.STRAIGHTJUMP
+				objA0.flags2a |= char.flag.IN_AIR
+				u8[A0 + 0x40] = 0				
+			}
+			SMSonic.AirSpinCounter = 0x20
+		}
+		char.velocity.y = max(char.velocity.y, -0x0fc0)
+	}
+}
+
+//BUBBLE SHIELD FIX 3d2d
+//OVERRIDES THE LANDING THAT PREVENT BOUNCING IF SUPER
+// - sota the knuck
+// SOTA ISTG SOTA THE NUCK WHY??!??!??!??!??!??!?? DID YOU PUT THE FUCKING AIR CURL RESET HERE WHY SOTA THE KNUCK WHY?!??!?1/1
+// -plush
+// so uhh 6 & 5 are used here so it affects all movesets 
+function void Character.LandingOnGroundResetState()
+{
+	if (XtraChar != 91 || SMSmoveset != 6)
+	{
+		if (char.character == CHARACTER_SONIC &&  SMSmoveset < 5)
+		//reset the triple trouble spin variable
+		SMSonic.AirSpinCounter = 0
+		
+		base.Character.LandingOnGroundResetState()
+		return
+	}
+}
+
+//MODIFIED SKILLSET FOR 3D2D MODE -- 1.3 added sonic blast hop, hyper dash base for non 3d2d movesets
+function void ExtraChar.pressedJumpInMidAir_char91()
+{
+	//this justs check for slot 91 if its using Sonic as a base which MS sonic does 
+	if (char.character != CHARACTER_SONIC)
+	{	//3k moveset non transformed
+		base.ExtraChar.pressedJumpInMidAir_char91()
+		return
+	}
+    // Remove control lock
+    char.flags &= ~char.flag.CONTROL_LOCK
+	#if STANDALONE
+		char.double_jump_state = 1    // Always set this flag; needed for Drop Dash
+	#endif
+
+	//In S3D2D sonic can use his insta shield and the shield powers if active. He should do the same here!
+	//For HyperSonic, we should trigger the Hyper Dash if directions are pressed. No direction = shield power or insta shield. Other moveset should trigger hyperdash on neutral however.
+	u8 input = control.player1.state & 0x0f	// Only directions
+	if (super.active == 0xff && input < 0x0b)	// Hyper and direction pressed, can't be triggered after a shield power is used
+	{
+		Character.ClearEnemiesOnScreen()
+
+		camera.locktime.player1 = 0x2000
+		ClearPositionBackup()
+
+		char.double_jump_state = 1
+		if (SMSflash)
+		{
+			u8[0xffffcd9c] = 1
+			global.whiteflash_timeout = 10
+		}
+
+		playSound(SFX_SPINDASH_RELEASE)
+
+		if (input != 0 && input < 0x0b)		// Not left and right at the same time
+		{
+			// Perform Hyper Dash
+			A1 = 0x011afa + input * 4
+			char.velocity.x  = s16[A1]
+			char.velocity.y  = s16[A1+2]
+			char.groundspeed = s16[A1]
+			
+			//create a short flash
+			if (SMSflash)
+			{
+				global.whiteflash_timeout = 10
+			}
+		}
+	}
+	else //normal, super and hyper with no directions
+	{
+	
+		//v1.3 Blast/SMS moveset -> just an extra jump like the lightning shield
+		if (char.character != CHARACTER_TAILS && (SMSmoveset == 0 || SMSmoveset == 4))
+		{
+						//u8[0xffffcd08] = 1
+			//we should spawn 4 3d2dStars with the right properties here
+			SMSonic.Blast.SpawnStar (char.position.x.u16, char.position.y.u16, 0x04, -0x02)
+			SMSonic.Blast.SpawnStar (char.position.x.u16, char.position.y.u16, -0x04, -0x02)
+			SMSonic.Blast.SpawnStar (char.position.x.u16, char.position.y.u16, 0x04, -0x06)
+			SMSonic.Blast.SpawnStar (char.position.x.u16, char.position.y.u16, -0x04, -0x06)
+			
+			char.double_jump_state = 0
+			//velocity based on underwater and gravity
+		   {
+		    if (u8[A0 + 0x2a] & char.flag.UNDERWATER)
+			{
+				char.velocity.y = (super.active) ? -0x3d2 : -0x2c0
+			}
+			else
+			{
+				char.velocity.y = (super.active) ? -0x829 : -0x580
+			}
+		   }
+			
+			char.jumping = 0 //no longer a jumping action
+			//*cutely spawns sonic blast sounds to scare benkoopa*
+			if (super.active || (SMSsounds && SMSPalette == 4 && (SMSmoveset == 0 || SMSmoveset == 4)))
+			{
+            Audio.playAudio("smsDB", AudioContext.CONTEXT_SOUND)
+			}
+			else
+			{
+			playSound(0x6b)//hopjump sound
+			}
+			return
+		}
+		//invincibility stays disabled, I can't lose those stars.
+		if ((u8[A0 + 0x2b] & char.bonus.INVINCIBLE)&&(!super.active))
+		{
+			return
+		}
+	
+		if (char.bonus_effect & char.bonus.SHIELD_FIRE)
+		{
+			u8[0xffffcd08] = 1        // That's 0x20 inside the shield object at 0xffffcce8
+			char.double_jump_state = 1
+			//SMSSonic.ShieldEffectActive = 1
+			s16 vx = 0x800
+			if (char.flags & char.flag.FACING_LEFT)
+				vx = -vx
+
+			char.velocity.x = vx
+			char.velocity.y = 0
+			char.groundspeed = vx
+			camera.locktime.player1 = 0x2000
+			ClearPositionBackup()
+			
+			playSound(SFX_FIRESHIELDDASH)
+		}
+		else if (char.bonus_effect & char.bonus.SHIELD_LIGHTNING)
+		{
+			u8[0xffffcd08] = 1
+			char.double_jump_state = 1
+			SMSSonic.ShieldEffectActive = 1
+			char.velocity.y = -0x580
+			char.jumping = 0
+			playSound(SFX_LIGHTNINGJUMP)
+		}
+		else if (char.bonus_effect & char.bonus.SHIELD_BUBBLE)
+		{
+			u8[0xffffcd08] = 1
+			char.double_jump_state = 1
+			SMSSonic.ShieldEffectActive = 1
+		#if STANDALONE
+			if (!Game.getSetting(SETTING_BUBBLE_SHIELD_BOUNCE))
+		#endif
+			{
+				char.velocity.x = 0
+			}
+			char.velocity.y = 0x800
+			char.groundspeed = 0
+			playSound(SFX_BUBBLEBOUNCE)
+		}
+		// Insta-Shield
+		if ((char.bonus_effect & char.bonus.ANY_SHIELD) == 0)
+		{
+			u8[0xffffcce8 + 0x20] = 1
+			char.double_jump_state = 1
+			playSound(SFX_INSTASHIELD)
+		}
+	}
+}
+
+//JUMP HEIGHT HIGHER IN SMS MODE
+//# translated(0x0117da) end(0x0118ba)
+//# translated(0x015002) end(0x0150d8)
+//# translated(0x017710) end(0x0177e8)
+function bool ExtraChar.checkStartJump_char91()
+{
+	if (XtraChar != 91 || char.character != CHARACTER_SONIC || SMSmoveset > 4)
+	{
+		return base.ExtraChar.checkStartJump_char91()
+	}
+	u8 input_pressed = control.player1.pressed
+	if ((input_pressed & CONTROL_ABC) == 0)
+		return false
+
+	D0 = char.rotation
+	if (global.inv_gravity)
+	{
+		D0.s8 = -D0.s8
+	}
+	else
+	{
+		D0.s8 += 0x80
+	}
+
+	pushA456()
+	fn00f72e()
+	popA456()
+
+	if (D1.s16 < 6)
+		return false
+
+   
+    // Get jump acceleration depending on character
+	u16 acceleration
+
+	//SMSSonic is the GOD JUMPER
+	
+	if (char.flags & char.flag.UNDERWATER)
+	{
+		acceleration = 0x400//0x380
+	}
+	else if (char.character == CHARACTER_SONIC && XtraChar == 91)
+	{
+		acceleration = (super.active == 0xff) ? 0x900 : (super.active) ? 0x800 : 0x750
+	}
+
+	u8 angle = char.rotation - 0x40
+	s32 accel_x = (s32(lookupCos(angle)) * acceleration) >> 8
+	s32 accel_y = (s32(lookupSin(angle)) * acceleration) >> 8
+
+	char.velocity.x += accel_x
+	char.velocity.y += accel_y
+
+	char.flags |= char.flag.IN_AIR
+	char.flags &= ~char.flag.PUSHING
+
+	char.jumping = 1
+	char.on_convex_surface = 0
+
+	playSound(SFX_JUMP)
+
+
+	// Start roll jump
+	if (char.flags & char.flag.ROLLING)
+	{
+	#if STANDALONE
+		if (!Game.getSetting(SETTING_NO_CONTROL_LOCK))
+	#endif
+		{
+			char.hitbox_extends.x = char.hitbox.default.x
+			char.hitbox_extends.y = char.hitbox.default.y
+			char.flags |= char.flag.CONTROL_LOCK
+		}
+	}
+	else
+	{
+		char.hitbox_extends.x = 7
+		char.hitbox_extends.y = 14
+		char.flags |= char.flag.ROLLING
+		char.state = char.state.ROLLING
+
+		s8 dy = s8(char.hitbox_extends.y) - s8(char.hitbox.default.y)
+		char.position.y.u16 += global.inv_gravity ? dy : -dy
+
+	#if STANDALONE
+		// Glitch fix for Knuckles being unable to jump off underwater objects
+		//  -> Move him up a single pixel up so he won't stick to objects
+		// TODO: Does not work for the HCZ snake platforms
+		if (acceleration <= 0x300 && (char.flags & char.flag.ON_OBJECT))
+		{
+			--char.position.y.u16
+		}
+	#endif
+	}
+	return true
+}
+
+//Change Sonic's speed cap with SMS moveset IN AIR
+//I do it here instead of SetSpeedCapProperties, as that one isn't triggered on every jump, leap, fall or landing, and I do not want to overcomplicate the code.
+//# address-hook(0x01164e) end(0x0116dc)
+//# address-hook(0x014e78) end(0x014f06)
+//# address-hook(0x017680) end(0x01770e)
+function void Character.UpdateControlInAir()
+{
+        if (XtraChar != 91 || char.character !=CHARACTER_SONIC||SMSmoveset > 4)
+		{
+		           base.Character.UpdateControlInAir()
+				   return
+		}
+
+	//DAGARDEN - AIR CONTROL OVERRIDE COMPATIBILIY
+	if (Mods.isModActive("Sonic 3: D.A. Garden Edition"))
+	{
+		if (System.getGlobalVariableValueByName("roll_maintain") && !System.getGlobalVariableValueByName("original_mode") && A0 == 0xffffb000 && !char.jumping && System.getGlobalVariableValueByName("air_time") < 5)
+		{
+			System.setGlobalVariableValueByName("air_time", System.getGlobalVariableValueByName("air_time") + 1)
+		}
+	}
+		
+		
+		u8 input_state = control.player1.state
+		s16 vx = char.velocity.x
+		
+		
+		//direct control
+		if  ((char.flags & char.flag.CONTROL_LOCK) == 0)
+		{
+
+		//s16 maxSpeed = s16[A4]
+		//s16 acceleration = s16[A4 + 2] * 2
+		//REDETERMINE SPEEDS BASED ON SITUATION
+		s16 maxSpeed
+		s16 acceleration
+		
+		if (char.flags & char.flag.UNDERWATER)// In water
+		{			
+			if (u8[A0 + 0x2b] & char.bonus.SPEED_UP)// Speed Shoes
+			{
+				maxSpeed = max(u16[A4], 0x600)
+				acceleration = (max(u16[A4 + 2], 0x0c))*2
+			}
+				else if (super.active)
+				{
+				        maxSpeed = max(u16[A4], 0x500)
+						acceleration = (max(u16[A4 + 2], 0x18))*2
+				}
+				else  //INCREASE NORMAL ACCELLERATION WHEN IN AIR
+				{
+				        if (true)//(char.flags & char.flag.IN_AIR)
+						{
+						        maxSpeed = max(u16[A4], 0x450)
+								acceleration = (max(u16[A4 + 2], 0x0e))*2 // 15
+						}
+						//else
+						//{
+						//     maxSpeed = max(u16[A4], 0x300)
+						//     acceleration = (max(u16[A4 + 2], 0x06))*2
+						//}
+		        }
+		}
+        else
+        { 
+		        //out of the water
+				if (u8[A0 + 0x2b] & char.bonus.SPEED_UP)
+				{
+				         maxSpeed =  max(u16[A4], 0xc00)
+						 acceleration  = (max(u16[A4 + 2], 0x18))*2 
+				}
+				else if (super.active)
+				{
+				         if(XtraChar == 91)
+				{
+					maxSpeed = max(u16[A4], 0xa00)
+					acceleration = (max(u16[A4 + 2], 0x20))*2
+					//3k uses 0x30, 3air uses 0x20
+				}
+			 }
+		    	else  //INCREASED NORMAL ACCELLERATION WHEN IN AIR
+			{
+				if (true)//(char.flags & char.flag.IN_AIR)
+				{
+					maxSpeed = max(u16[A4], 0x800)
+					acceleration = (max(u16[A4 + 2], 0x18))*2 //24
+				}
+				//else
+				//{
+				//	maxSpeed = max(u16[A4], 0x600)
+				//	acceleration = (max(u16[A4 + 2], 0x0c))*2 //12
+				//}
+			}
+		}
+		//END
+
+		if (input_state & CONTROL_LEFT)
+		{
+			char.flags |= char.flag.FACING_LEFT
+			vx -= acceleration
+			if (vx <= -maxSpeed)
+			{
+				vx += acceleration
+				vx = min(vx, -maxSpeed)
+			}
+		}
+		if (input_state & CONTROL_RIGHT)
+		{
+			char.flags &= ~char.flag.FACING_LEFT
+			vx += acceleration
+			if (vx >= maxSpeed)
+			{
+				vx -= acceleration
+				vx = max(vx, maxSpeed)
+			}
+		}
+	}
+
+    
+	// Center camera y-offset again
+	centerCameraYOffset()
+	
+	// air drag
+	if  (char.velocity.y < 0 && char.velocity.y >= -0x400)
+	{
+	         s16 drag = vx >> 5
+			 if (drag != 0)
+			 {
+			        vx -= drag
+					if (drag > 0)
+					        vx = max(vx, 0)
+				    else     
+					        vx = min(vx, 0)
+			 }
+    }
+	char.velocity.x = vx
+}
+
+//CUSTOM SET SPEEDS FOR THE AIR CONTROL
+function void SMSMODEsetSpeedCapProperties(u32 address, bool isSuperActive)
+{	
+	// Set new max speed cap etc.:
+	//  - u16[address]     = maximum speed			-> e.g. global.move.speedcap
+	//  - u16[address + 2] = maximum acceleration	-> e.g. global.move.acceleration
+	//  - u16[address + 4] = maximum deceleration	-> e.g. global.move.deceleration
+    
+	if (char.flags & char.flag.UNDERWATER)
+	{
+	         
+		 //in water
+    #if STANDALONE
+	        if (u8[A0 + 0x2b] & char.bonus.SPEED_UP)
+			{
+			        u16[address] = max(u16[address], 0x600)
+					u16[address + 2] = max(u16[address + 2], 0x0c)
+					u16[address + 4] = max(u16[address + 4], 0x40)
+			}
+			else
+	#endif
+	        if (isSuperActive)
+			{
+			    (XtraChar == 91)
+				{
+				u16[address] = 0x500
+				u16[address + 2] = 0x18
+				u16[address + 4] = 0x80		
+				}
+			}
+			else //INCREASED NORMAL ACCELLERATION WHEN IN AIR
+			{
+			    if(true)//(char.flags & char.flag.IN_AIR)
+				{ 
+				        playSound(0x38)
+			           u16[address] = 0x450
+					   u16[address + 2] = 0x0e // 15
+					   u16[address + 4] = 0x60			          
+                }
+			    else
+			    {
+	     			   u16[address] = 0x300
+			 		   u16[address + 2] = 0x06
+					   u16[address + 4] = 0x40
+			    }
+		    }
+	}
+	else
+	{
+		// Out of water
+	#if STANDALONE
+		if (u8[A0 + 0x2b] & char.bonus.SPEED_UP)
+		{
+			u16[address] = max(u16[address], 0xc00)
+			u16[address + 2] = max(u16[address + 2], 0x18)
+			u16[address + 4] = max(u16[address + 4], 0x80)
+		}
+		else
+	#endif
+		if (isSuperActive)
+		{
+			if (XtraChar == 91)
+			{
+				u16[address] = 0xa00
+				u16[address + 2] = 0x30
+				u16[address + 4] = 0x100
+			#if STANDALONE
+				// Use an acceleration value that makes Super Sonic a bit more controllable
+				u16[address + 2] = 0x20 //36
+			#endif
+			}
+		}
+		else  //INCREASED NORMAL ACCELLERATION WHEN IN AIR
+		{
+			if (true)//(char.flags & char.flag.IN_AIR)
+			{
+				u16[address] = 0x800
+				u16[address + 2] = 0x18 //24
+				u16[address + 4] = 0x60
+			}
+			else
+			{
+				u16[address] = 0x600
+				u16[address + 2] = 0x0c //12
+				u16[address + 4] = 0x80
+			}
+		}
+	}
+}
+
+// i made some changes to the strike dash script -plush
+function bool Character.updateSuperPeelout()
+{
+	if (XtraChar != 91 && SMSmoveset < 5)
+	{
+		return base.Character.updateSuperPeelout()
+	}
+	//movesets S1/2 and Blast do not peelout/strikedash at all
+	if (SMSmoveset == 1 || SMSmoveset == 4)
+		return false
+		
+	if (Mods.isModActive("CREATIVE FREEDOM"))
+		return false
+	u8 input_state   = control.player1.state
+	u8 input_pressed = control.player1.pressed
+
+	if (char.spindash == 0)
+	{
+		bool canStartPeelout = (char.state == char.state.LOOKING_UP) && (input_pressed & CONTROL_ABC) && (player1.control_override == 0)	// Last check is needed in cutscenes (e.g. end of MHZ 2)
+		if (!canStartPeelout)
+		{
+			// Nothing to see here
+			return false
+		}
+
+		char.state = char.state.RUNNING
+		char.spindash = 0x80
+		char.spindash_charge = 0
+		Audio.playAudio("peelout_charge", AudioContext.CONTEXT_SOUND)
+	}
+	else if (char.spindash == 0x80)
+	{	
+		if (SMSmoveset < 5 && !super.active && char.spindash_charge >= 0x800 && (char.bonus_effect & char.bonus.ANY_SHIELD) == 0)
+		{
+								//same as invincibility
+			
+			u32[0xffffcd7c] = 0x0187f0	// Invincibility stars
+			u16[0xffffcd7c + 0x42] = A0.u16
+		}
+		if (input_state & CONTROL_UP)
+		{
+			// Charge up
+			char.spindash_charge = clamp(char.spindash_charge + 0x40, 0x100, 0x800)
+			if (char.flags & char.flag.UNDERWATER)
+			{
+				char.groundspeed = 0x300 + ((super.active) ? (char.spindash_charge) : (char.spindash_charge * 3/4))
+			}
+			else
+			{
+				char.groundspeed = 0x400 + ((super.active) ? (char.spindash_charge * 3/2) : (char.spindash_charge))
+			}
+
+			char.flags &= ~char.flag.PUSHING
+			if (abs(char.groundspeed) >= 0x0a00)
+				sonic.fastrunanim.timer = 30
+			playSound(0x00)
+
+		}
+		else
+		{
+			releaseSuperPeelout()
+			if (!super.active && (char.bonus_effect & char.bonus.ANY_SHIELD) == 0 && char.spindash_charge >= 0x800)
+			{
+				char.bonus_effect = char.bonus.INVINCIBLE
+				if (char.invinc.countdown < 0x6) //char.invinc.countdown
+				char.invinc.countdown = 0x6
+				if (SMSsounds)
+				{
+					playSound(0x9c)
+				}
+			}
+		}
+
+		// Center camera y-offset again
+		centerCameraYOffset()
+	}
+
+	Character.CheckAgainstMoveBorders()
+	Character.UpdateRotationOnGround()
+	partialUpdateCharacterOnGround()
+
+	return true
+}
+
+//MONO-CHARGE SPINDASH IN SMS MODE
+//# translated(0x011bde) end(0x011cf0)
+//# translated(0x011d16) end(0x011da4)
+//# translated(0x0151fc) end(0x01530c)
+//# translated(0x015332) end(0x0153c0)
+function bool Character.UpdateSpindash()
+{
+	// Ignore this while charging the Super Peel-Out
+	if (char.spindash == 0x80)
+		return false
+	
+	if ((XtraChar != 91 || char.character != CHARACTER_SONIC ||SMSmoveset > 4))
+	{
+		return base.Character.UpdateSpindash()
+	}
+
+//no need to check for peelout, sms sonic doesn't have it
+
+	u8 input_state   = control.player1.state
+	u8 input_pressed = control.player1.pressed
+
+	if (char.spindash == 0)
+	{
+		bool canStartSpindash = (char.state == char.state.COWERING) && (input_pressed & CONTROL_ABC)
+		if (!canStartSpindash)
+		{
+			// Nothing to see here
+			return false
+		}
+
+		// Start spindash
+		char.state = char.state.SPINDASH
+		playSound(SFX_SPINDASH_CHARGE)
+
+		char.spindash = 1
+		char.spindash_charge = 0
+		if (char.drown_countdown >= 12)
+		{
+			// Set state of dust cloud object to 0x02
+			u8[A6 + 0x20] = 0x02
+		}
+	}
+	else
+	{
+		if (input_state & CONTROL_DOWN)
+		{
+			// Update spindash
+			if (char.spindash_charge > 0)
+			{
+				char.spindash_charge -= char.spindash_charge >> 5
+				if (s16(char.spindash_charge) < 0)
+					char.spindash_charge = 0
+			}
+			// No charge in SMS mode
+			if (SMSBuff == 1 || SMSBuff == 2)
+			{
+							 if (super.active & 0x80 && input_pressed & CONTROL_ABC)
+			                 {
+				                 char.state.both = 0x0900
+				                 char.spindash_charge = min(char.spindash_charge + 0x200, 0x800)
+				                 playSound(SFX_SPINDASH_CHARGE)	
+				             }
+							 else if (super.active && input_pressed & CONTROL_ABC && SMSBuff == 1)
+				             {
+					             // Charge up
+					             char.state.both = 0x0900
+					             char.spindash_charge = min(char.spindash_charge + 0x200, 0x800)
+					             playSound(SFX_SPINDASH_CHARGE)
+				             }
+			}
+		}
+		else
+		{
+			releaseSpindash()
+		}
+
+		// Center camera y-offset again
+		centerCameraYOffset()
+	}
+
+	Character.CheckAgainstMoveBorders()
+	Character.UpdateRotationOnGround()
+	partialUpdateCharacterOnGround()
+
+	return true
+}
+
+
+//v1.3 Update - Disable instashield properties for secondary action
+//now that we have a secondary jump action, we can't give it insta shield properties.
+//# address-hook(0x00fe8e) end(0x00ff04)
+function void Character.CheckCollisionsWithDynamicObjects()
+{
+	if (XtraChar != 91 || char.character != CHARACTER_SONIC || SMSmoveset > 4)
+	{	//not sonic, or 3k or 3d2d moveset
+		base.Character.CheckCollisionsWithDynamicObjects()
+		return
+	}
+	
+	SonicUpdateRingCollection()
+	UpdateShieldDeflecting()
+
+	//no insta shield effect nor hitbox for sms based movesets
+	
+	D5 = char.hitbox_extends.y - 3
+	D2 = char.position.x.u16 - 8
+	D3 = char.position.y.u16 - D5.u16
+	D4 = 16
+	D5 *= 2
+	Character.CheckCollisionsWithDynamicObjects_partial()
+}
+
+//# address-hook(0x01021e) end(0x010288)
+function void ExtraChar.onThreatCollision_char91()
+{
+
+	// Check for shield or invincibility
+	D0.u8 = (char.bonus_effect & (char.bonus.ALL_SHIELDS | char.bonus.INVINCIBLE))
+	if (D0.u8 != 0)
+	{
+		D0.u8 &= u8[A1 + 0x2b]
+		if (D0.u8 != 0)
+		{
+			D0 = 0xffffffff
+			return
+		}
+
+		if ((char.bonus_effect & char.bonus.ANY_SHIELD) == 0)
+		{
+			if ((char.bonus_effect & char.bonus.INVINCIBLE) == 0)
+			{
+				Character.OnThreatCollisionInner()
+			}
+			D0 = 0xffffffff
+			return
+		}
+	}
+	else
+	{
+		// SMS Sonic doesn't have insta shield with SMS movesets
+		Character.OnThreatCollisionInner()
+		return
+	}
+
+	if ((u8[A1 + 0x2b] & char.bonus.DEFLECTABLE) == 0)
+	{
+		if ((char.bonus_effect & char.bonus.INVINCIBLE) == 0)
+		{
+			Character.OnThreatCollisionInner()
+		}
+	}
+	else
+	{
+		deflectProjectile()
+	}
+	D0 = 0xffffffff
+}
+
+//Master System Sonic only Blast Jump Stars
+function void SMSonic.Blast.SpawnStar (u16 posx, u16 posy, u16 speedx, u16 speedy)
+{
+	//instance a 3d2dstars with linear movement properties
+	//backup A1 and A0
+	push(A1)
+	push(A0)
+	if (allocDynamicObjectStd())
+	{
+		A0 = 0xffffb000
+		objA1.update_address = 0x20008a		//NOTE: 200099 is too high!
+		objA1.box_size.x = 0x5									
+		objA1.box_size.y = 0x5
+		//get the render flags
+		objA1.render_flags = objA0.render_flags
+		objA1.position.x.u16 = posx
+		objA1.position.y.u16 = posy+0x08
+		objA1.velocity.x = speedx		
+		objA1.velocity.y = speedy
+		if (global.inv_gravity)
+		{
+			objA1.velocity.y = objA1.velocity.y * -1
+		}
+		// starting sprite number
+		objA1.animation.sprite = 0
+	}
+	//restore A1 and A0
+	A0 = pop()
+	A1 = pop()	
+}
+
+
+
+//UPDATE A STAR USING THE ADDRESS HOOK I CHOOSE WHEN INSTANCING
+//# address-hook(0x20008a)
+function void SMSonic.Blast.Update()
+{
+	u16 posx = objA0.position.x.u16
+	u16 posy = objA0.position.y.u16		
+	
+	objA0.position.x.u16 = objA0.position.x.u16 + objA0.velocity.x
+	objA0.position.y.u16 = objA0.position.y.u16 + objA0.velocity.y
+		
+	//System.writeDisplayLine(stringformat("Y: %02x",objA0.position.y.u16))			
+	//die
+	if (objA0.animation.sprite > 0x0d)
+	{ 	
+		//this star dies
+		UnloadObject()
+		return //do not trigger rendering on a dead item
+	}
+	else
+	{
+		//increase sprite
+		objA0.animation.sprite = objA0.animation.sprite + 1
+	}	
+	//without this the game doesn't render!
+	DrawObject()
+}
