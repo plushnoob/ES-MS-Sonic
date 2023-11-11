@@ -178,7 +178,7 @@ function void ExtraChar.drawCharacterSprite_char91()
 		}
 		if (animationSprite == 0xad)
 		{
-			key = "SMS_closed"
+			key = "character_slot91_0xbb"
 		}
 
 		if (key == 0 && animationSpriteEx >= 0x100)
@@ -199,9 +199,7 @@ function void ExtraChar.drawCharacterSprite_char91()
 		if (key == 0)
 		{
 			       // if your wondering if this breaks other chars no it doesnt
-					u64 normalkey = stringformat("character_slot91_0x%02x", animationSprite)
-					u64 superkey = stringformat("character_superslot91_%s_0x%02x", getsmssupertype(), animationSprite)
-					key = (super.active ? superkey : normalkey)
+					key = (super.active) ? stringformat("character_superslot91_%s_0x%02x", getsmssupertype(), animationSprite) : stringformat("character_slot91_0x%02x", animationSprite)
 
 
 			if (!Renderer.hasCustomSprite(key))

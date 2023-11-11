@@ -15,7 +15,7 @@ function string RenderExtraCharIcon(u8 xtrachar)
 {
 	if (xtrachar == 91)
 	{
-		u64 names = (SMSPalette == 0) ? "legacy" : (SMSPalette == 1) ? "s1" : (SMSPalette == 2) ? "s2" : (SMSPalette == 3) ? "tt" : (SMSPalette == 4) ? "blast" : (SMSPalette == 5) ? "SMSR" : (SMSPalette == 6) ? "lunar" : (SMSPalette == 7) ? "shima" :"B&PS"
+		u64 names = (SMSPalette == 0) ? "legacy" : (SMSPalette == 1) ? "s1" : (SMSPalette == 2) ? "tt" : (SMSPalette == 3) ? "blast" : (SMSPalette == 4) ? "SMSR" : (SMSPalette == 5) ? "lunar" : (SMSPalette == 6) ? "shima" : (SMSPalette == 7) ? "S3" : "P"
 		return stringformat("level_select_S3C_%s", names)
 	}
 	return base.RenderExtraCharIcon(xtrachar)
@@ -267,6 +267,20 @@ function s32 ESS_saveBoxGetColor_Es(u8 ES_val)
 		return 0x48b6c7
 	
 	return base.ESS_saveBoxGetColor_Es(ES_val)
+}
+function string ExtraChar.getIconSpriteKey(u8 slot)
+{
+	if (global.xtrachar == 91)
+	{
+		string key = stringformat("slots_display_0x%02x_slot%d", slot, global.xtrachar)
+
+		if (slot == 0x01)
+			key = "slots_display_slot91"
+
+		if (Renderer.hasCustomSprite(key))
+			return key
+	}
+	return base.ExtraChar.getIconSpriteKey(slot)
 }
 // da garden stuff
 function void ExtraChar.Challenges.drawCharacterContinueSprite(u8 xtrachar, s16 px, s16 py, u8 flags, u16 renderQueue)

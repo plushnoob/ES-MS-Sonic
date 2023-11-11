@@ -137,7 +137,7 @@ function void ExtraChar.pressedJumpInMidAir_char91()
 	//In S3D2D sonic can use his insta shield and the shield powers if active. He should do the same here!
 	//For HyperSonic, we should trigger the Hyper Dash if directions are pressed. No direction = shield power or insta shield. Other moveset should trigger hyperdash on neutral however.
 	u8 input = control.player1.state & 0x0f	// Only directions
-	if (super.active == 0xff &&input != 0 && input < 0x0b)	// Hyper and direction pressed, can't be triggered after a shield power is used
+	if (super.active == 0xff && input < 0x0b)	// Hyper and direction pressed, can't be triggered after a shield power is used
 	{
 		Character.ClearEnemiesOnScreen()
 
@@ -304,13 +304,9 @@ function bool ExtraChar.checkStartJump_char91()
 	{
 		acceleration = 0x400//0x380
 	}
-	else if (super.active && char.character == CHARACTER_SONIC && XtraChar == 91)
+	else if (char.character == CHARACTER_SONIC && XtraChar == 91)
 	{
-		acceleration = 0x800
-	}
-	else
-	{
-		acceleration = 0x750
+		acceleration = (super.active == 0xff) ? 0x900 : (super.active) ? 0x800 : 0x750
 	}
 
 	u8 angle = char.rotation - 0x40
@@ -623,21 +619,14 @@ function bool Character.updateSuperPeelout()
 		Audio.playAudio("peelout_charge", AudioContext.CONTEXT_SOUND)
 	}
 	else if (char.spindash == 0x80)
-	{
-		//strikedash -> trigger a short invincibility status while charging. Spawn invincibility stars if not transformed
-		if (SMSmoveset < 5 && !super.active && char.spindash_charge >= 0x800)
+	{	
+		if (SMSmoveset < 5 && !super.active && char.spindash_charge >= 0x800 && (char.bonus_effect & char.bonus.ANY_SHIELD) == 0)
 		{
-			if ((char.bonus_effect & char.bonus.ANY_SHIELD) == 0)
-			{
-				//same as invincibility
-				if (char.invinc.countdown < 0x6) //char.invinc.countdown
-					char.invinc.countdown = 0x6
+								//same as invincibility
 			
-				u32[0xffffcd7c] = 0x0187f0	// Invincibility stars
-				u16[0xffffcd7c + 0x42] = A0.u16
-			}
-
-		}		
+			u32[0xffffcd7c] = 0x0187f0	// Invincibility stars
+			u16[0xffffcd7c + 0x42] = A0.u16
+		}
 		if (input_state & CONTROL_UP)
 		{
 			// Charge up
@@ -660,11 +649,12 @@ function bool Character.updateSuperPeelout()
 		else
 		{
 			releaseSuperPeelout()
-
-			if ((char.bonus_effect & char.bonus.ANY_SHIELD) == 0)
+			if (!super.active && (char.bonus_effect & char.bonus.ANY_SHIELD) == 0 && char.spindash_charge >= 0x800)
 			{
-				char.bonus_effect |= char.bonus.INVINCIBLE
-				if (SMSsounds && !super.active && char.spindash_charge >= 0x800)
+				char.bonus_effect = char.bonus.INVINCIBLE
+				if (char.invinc.countdown < 0x6) //char.invinc.countdown
+				char.invinc.countdown = 0x6
+				if (SMSsounds)
 				{
 					playSound(0x9c)
 				}

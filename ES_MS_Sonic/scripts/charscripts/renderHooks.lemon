@@ -15,12 +15,12 @@ function string LivesandContinuesSMS()
 }
 function string getSMSSprite()
 {
-	return (SMSPalette == 0) ? "dataSel_slot91" : (SMSPalette == 1) ? "dataSel_s1" : (SMSPalette == 2) ? "dataSel_s2" : (SMSPalette == 3) ? "dataSel_tt" : (SMSPalette == 4) ? "dataSel_blast" : (SMSPalette == 5) ? "dataSel_SMSR" : (SMSPalette == 6) ? "dataSel_lunar" : (SMSPalette == 7) ? "dataSel_oma" : "dataSel_B&PS"
+	return (SMSPalette == 0) ? "dataSel_slot91" : (SMSPalette == 1) ? "dataSel_s1" : (SMSPalette == 2) ? "dataSel_tt" : (SMSPalette == 3) ? "dataSel_blast" : (SMSPalette == 4) ? "dataSel_SMSR" : (SMSPalette == 5) ? "dataSel_lunar" : ( SMSPalette == 6) ? "dataSel_oma" : ( SMSPalette == 7) ? "dataSel_S3" : "dataSel_P"
 }
 // best ending stuff
 function string getSMSSpriteBE()
 {
-	return (SMSPalette == 0) ? "BE_legacy" : (SMSPalette == 1) ? "BE_s1" : (SMSPalette == 2) ? "BE_s2" : (SMSPalette == 3) ? "BE_tt" : (SMSPalette == 4) ? "BE_blast" : ( SMSPalette == 5) ? "BE_SMSR" : ( SMSPalette == 6) ? "BE_lunar" : (SMSPalette == 7) ? "BE_oma" : "BE_B&PS"
+	return (SMSPalette == 0) ? "BE_legacy" : (SMSPalette == 1) ? "BE_s1" : (SMSPalette == 2) ? "BE_tt" : (SMSPalette == 3) ? "BE_blast" : ( SMSPalette == 4) ? "BE_SMSR" : ( SMSPalette == 5) ? "BE_lunar" : ( SMSPalette == 6) ? "BE_oma" : ( SMSPalette == 7) ? "BE_S3" : "BE_P"
 }
 function string Special_Continue_icons_SMS()
 {
@@ -295,7 +295,7 @@ function bool Standalone.onWriteToSpriteTable(s16 px, s16 py, u16 renderQueue)
 			{
 				if (char.animation.sprite >= 0xb0 && char.animation.sprite <= 0xb4 && objA0.update_address != 0x04e202 && objA0.update_address != 0x04e2f0)
 				{
-					key = (SMSPalette == 0) ? "dataSel_slot91" : (SMSPalette == 1) ? "dataSel_s1" : (SMSPalette == 2) ? "dataSel_s2" : (SMSPalette == 3) ? "dataSel_tt" : (SMSPalette == 4) ? "dataSel_blast" : (SMSPalette == 5) ? "dataSel_SMSR" : (SMSPalette == 6) ? "dataSel_lunar" : (SMSPalette == 7) ? "dataSel_oma" : "dataSel_B&PS"
+					key = (SMSPalette == 0) ? "dataSel_slot91" : (SMSPalette == 1) ? "dataSel_s1" : (SMSPalette == 2) ? "dataSel_tt" : (SMSPalette == 3) ? "dataSel_blast" : (SMSPalette == 4) ? "dataSel_SMSR" : (SMSPalette == 5) ? "dataSel_lunar" : (SMSPalette == 6) ? "dataSel_oma" : ( SMSPalette == 7) ? "dataSel_S3" : "dataSel_P"
 					s16 py2 = py + 0x0d
 						Renderer.drawCustomSprite(key, px, py2, 0x00, flags, renderQueue + 1)
 					if (objA0.animation.sprite == 0xb4)
@@ -330,7 +330,7 @@ function bool Standalone.onWriteToSpriteTable(s16 px, s16 py, u16 renderQueue)
 					
 					key = stringformat("bluesphere_slot91_0x%02x", objA0.animation.sprite)
 				
-                 u64 palettekey = (SMSPalette == 0) ? "slot91palette_bluesphere_legacy" : (SMSPalette == 1) ? "slot91palette_bluesphere_s1" : (SMSPalette == 2) ? "slot91palette_bluesphere_s2" : (SMSPalette == 3) ? "slot91palette_bluesphere_tt" : (SMSPalette == 4) ?"slot91palette_bluesphere_blast" : (SMSPalette == 5) ? "slot91palette_bluesphere_SMSR" :  (SMSPalette == 6)  ? "slot91palette_bluesphere_speedster" : (SMSPalette == 7) ? "slot91palette_bluesphere_oma" : "slot91palette_bluesphere_B&PS"
+                 u64 palettekey = (SMSPalette == 0) ? "slot91palette_bluesphere_legacy" : (SMSPalette == 1) ? "slot91palette_bluesphere_s1" : (SMSPalette == 2) ? "slot91palette_bluesphere_tt" : (SMSPalette == 3) ?"slot91palette_bluesphere_blast" : (SMSPalette == 4) ? "slot91palette_bluesphere_SMSR" :  (SMSPalette == 5)  ? "slot91palette_bluesphere_speedster" :  (SMSPalette == 5)  ? "slot91palette_bluesphere_oma" : (SMSPalette == 6)  ? "slot91palette_bluesphere_S3" : "slot91palette_bluesphere_P"
 				
 				if (Renderer.hasCustomSprite(key))
 				{
@@ -476,7 +476,7 @@ function void SpecialStage()
 	}*/
 
 #if STANDALONE
-        u64 palettekey = (SMSPalette == 0) ? "slot91palette_bluesphere_legacy" : (SMSPalette == 1) ? "slot91palette_bluesphere_s1" : (SMSPalette == 2) ? "slot91palette_bluesphere_s2" : (SMSPalette == 3) ? "slot91palette_bluesphere_tt" : (SMSPalette == 4) ?"slot91palette_bluesphere_blast" : (SMSPalette == 5) ? "slot91palette_bluesphere_SMSR" :  (SMSPalette == 6)  ? "slot91palette_bluesphere_speedster" : (SMSPalette == 7) ? "slot91palette_bluesphere_oma" : "slot91palette_bluesphere_B&PS"
+        u64 palettekey = (SMSPalette == 0) ? "slot91palette_bluesphere_legacy" : (SMSPalette == 1) ? "slot91palette_bluesphere_s1" : (SMSPalette == 2) ? "slot91palette_bluesphere_tt" : (SMSPalette == 3) ?"slot91palette_bluesphere_blast" : (SMSPalette == 4) ? "slot91palette_bluesphere_SMSR" :  (SMSPalette == 5)  ? "slot91palette_bluesphere_speedster" : (SMSPalette == 5)  ? "slot91palette_bluesphere_oma" : (SMSPalette == 6)  ? "slot91palette_bluesphere_S3" : "slot91palette_bluesphere_P"
 		
 		u16 numColors = System.loadExternalPaletteData(palettekey, 0, 0x800000, 0x20)
 
@@ -680,19 +680,19 @@ function string getCharacterPaletteKey(u8 character)
 		    else if (SMSPalette == 1)
 			return "slot91palette_s1"
             else if (SMSPalette == 2)
-			return "slot91palette_s2"
-            else if (SMSPalette == 3)
 			return "slot91palette_tt"
-            else if (SMSPalette == 4)
+            else if (SMSPalette == 3)
 			return "slot91palette_blast"
-		    else if (SMSPalette == 5)
+		    else if (SMSPalette == 4)
 			return "slot91palette_SMSR"
-	        else if (SMSPalette == 6)
+	        else if (SMSPalette == 5)
 			return "slot91palette_speedster"
-	        else if (SMSPalette == 7)
+	        else if (SMSPalette == 6)
 			return "slot91palette_oma"
+			else if (SMSPalette == 7)
+			return "slot91palette_S3C"
 			else if (SMSPalette == 8)
-			return "slot91palette_B&PS"
+			return "slot91palette_P"
 	}
     return base.getCharacterPaletteKey(character)
 }
@@ -716,5 +716,5 @@ function string getCharacterEndPosePaletteKey(u8 character)
         return base.getCharacterEndPosePaletteKey(character)
     }
 
-    return (SMSPalette == 0) ? "endpose_palette_L" : (SMSPalette == 1) ? "endpose_palette_s1" : (SMSPalette == 2) ? "endpose_palette_s2" : (SMSPalette == 3) ? "endpose_palette_tt" : (SMSPalette == 4) ? "endpose_palette_blast" : (SMSPalette == 5) ? "endpose_palette_SMSR" : (SMSPalette == 6) ? "endpose_palette_lunar" : (SMSPalette == 7) ? "endpose_palette_oma" : "endpose_palette_B&PS"
+    return (SMSPalette == 0) ? "endpose_palette_L" : (SMSPalette == 1) ? "endpose_palette_s1" : (SMSPalette == 2) ? "endpose_palette_tt" : (SMSPalette == 3) ? "endpose_palette_blast" : (SMSPalette == 4) ? "endpose_palette_SMSR" : (SMSPalette == 5) ? "endpose_palette_lunar" : (SMSPalette == 6) ? "endpose_palette_S3" : "endpose_palette_P"
 }
